@@ -1,0 +1,584 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>個人社労士向け 危機管理インタラクティブガイド</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700&display=swap" rel="stylesheet">
+    <!-- Chosen Palette: Warm Neutral Harmony -->
+    <!-- Application Structure Plan: The SPA is structured chronologically into four phases: 1. 事前準備 (Preparation), 2. 緊急対応 (Emergency Response), 3. 療養・休業中 (During Leave), and 4. 復帰準備 (Return to Work). This task-oriented flow is more intuitive and actionable for a user facing a crisis than the report's original chapter-based structure. It guides the user through what to do before, during, and after the event. Key interactions include an interactive BCP checklist, a simple financial impact simulator, and clickable diagrams for support networks, making dense information digestible and engaging. -->
+    <!-- Visualization & Content Choices: 
+        - Report Info: BCP elements. -> Goal: Organize/Inform. -> Viz/Method: Interactive HTML checklist. -> Interaction: Click to expand details. -> Justification: Turns a static table into an actionable tool. -> Library/Method: Vanilla JS, Tailwind CSS.
+        - Report Info: Financial impact and insurance options. -> Goal: Compare/Inform. -> Viz/Method: Bar chart (Chart.js). -> Interaction: Select income level to update chart, showing potential income loss vs. insurance coverage. -> Justification: Visualizes abstract financial data, aiding decision-making. -> Library/Method: Chart.js.
+        - Report Info: Support networks (associations, partners). -> Goal: Organize. -> Viz/Method: Clickable HTML/CSS diagram. -> Interaction: Click on a support pillar to see details. -> Justification: Simplifies complex relationships into a clear visual map. -> Library/Method: Vanilla JS, Tailwind CSS.
+        - Report Info: Legal obligations (confidentiality, contracts). -> Goal: Inform. -> Viz/Method: Accordion-style cards. -> Interaction: Click to expand/collapse. -> Justification: Breaks down heavy legal text into manageable, focused sections. -> Library/Method: Vanilla JS, Tailwind CSS.
+    -->
+    <!-- CONFIRMATION: NO SVG graphics used. NO Mermaid JS used. -->
+    <style>
+        body {
+            font-family: 'Noto Sans JP', sans-serif;
+            background-color: #FDFBF8;
+            color: #333333;
+        }
+        .nav-active {
+            color: #2563EB;
+            font-weight: 700;
+            border-bottom: 2px solid #2563EB;
+        }
+        .nav-inactive {
+            color: #4B5563;
+            border-bottom: 2px solid transparent;
+        }
+        .card {
+            background-color: #FFFFFF;
+            border-radius: 0.75rem;
+            box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+            transition: all 0.3s ease-in-out;
+        }
+        .card-header {
+            cursor: pointer;
+            padding: 1rem 1.5rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .card-content {
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.5s ease-in-out;
+            padding: 0 1.5rem;
+        }
+        .content-inner {
+            padding-bottom: 1.5rem;
+        }
+        .chart-container {
+            position: relative;
+            width: 100%;
+            max-width: 600px;
+            margin-left: auto;
+            margin-right: auto;
+            height: 300px;
+            max-height: 400px;
+        }
+        @media (min-width: 768px) {
+            .chart-container {
+                height: 350px;
+            }
+        }
+        .tab-button {
+            transition: all 0.3s;
+        }
+        .tab-button.active {
+            background-color: #3B82F6;
+            color: white;
+        }
+        .tab-button:not(.active) {
+            background-color: #E5E7EB;
+            color: #374151;
+        }
+        .flow-step {
+            position: relative;
+            padding-left: 2.5rem;
+            padding-bottom: 2rem;
+            border-left: 2px solid #D1D5DB;
+        }
+        .flow-step:last-child {
+            border-left: 2px solid transparent;
+        }
+        .flow-dot {
+            position: absolute;
+            left: -0.7rem;
+            top: 0.1rem;
+            width: 1.25rem;
+            height: 1.25rem;
+            border-radius: 9999px;
+            background-color: #FFFFFF;
+            border: 2px solid #3B82F6;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .flow-dot-inner {
+            width: 0.625rem;
+            height: 0.625rem;
+            border-radius: 9999px;
+            background-color: #3B82F6;
+        }
+        .bcp-item.completed .bcp-checkbox {
+            background-color: #3B82F6;
+            border-color: #3B82F6;
+        }
+        .bcp-item.completed .bcp-checkbox::after {
+            content: '✔';
+            color: white;
+            font-size: 14px;
+            line-height: 1;
+        }
+    </style>
+</head>
+<body class="antialiased">
+
+    <header class="bg-white/80 backdrop-blur-md sticky top-0 z-50 shadow-sm">
+        <nav class="container mx-auto px-4">
+            <div class="flex items-center justify-between h-16">
+                <h1 class="text-lg md:text-xl font-bold text-gray-800">個人社労士 危機管理ガイド</h1>
+                <div class="hidden md:flex space-x-6">
+                    <a href="#preparation" class="nav-link nav-inactive px-2 py-1">事前準備</a>
+                    <a href="#emergency" class="nav-link nav-inactive px-2 py-1">緊急対応</a>
+                    <a href="#during-leave" class="nav-link nav-inactive px-2 py-1">休業中の管理</a>
+                    <a href="#return" class="nav-link nav-inactive px-2 py-1">復帰準備</a>
+                </div>
+                <div class="md:hidden">
+                    <select id="mobile-nav" class="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
+                        <option value="#preparation">事前準備</option>
+                        <option value="#emergency">緊急対応</option>
+                        <option value="#during-leave">休業中の管理</option>
+                        <option value="#return">復帰準備</option>
+                    </select>
+                </div>
+            </div>
+        </nav>
+    </header>
+
+    <main class="container mx-auto px-4 py-8 md:py-12">
+        <div class="text-center mb-12">
+            <h2 class="text-3xl md:text-4xl font-bold text-gray-900">個人事務所の社労士が病気入院した場合の</h2>
+            <p class="text-3xl md:text-4xl font-bold text-blue-600">事業継続と危機管理ガイド</p>
+            <p class="mt-4 max-w-3xl mx-auto text-gray-600">
+                従業員のいない個人事務所では、所長自身の健康が事業の生命線です。このガイドは、病気や入院という不測の事態に直面した際に、顧客への影響を最小限に抑え、スムーズに事業を継続・再開するための具体的なステップをインタラクティブに解説します。
+            </p>
+        </div>
+
+        <section id="preparation" class="mb-16 scroll-mt-20">
+            <div class="flex items-center mb-6">
+                <span class="text-4xl mr-4">🛡️</span>
+                <div>
+                    <h3 class="text-2xl font-bold text-gray-800">Phase 1: 事前準備 - 転ばぬ先の杖</h3>
+                    <p class="text-gray-600">平時の備えが、有事の際のダメージを最小限に食い止めます。ここでは、事業継続の基盤となる計画、体制、経済的備えについて学びます。</p>
+                </div>
+            </div>
+
+            <div class="grid md:grid-cols-2 gap-8">
+                <div class="card">
+                    <div class="p-6">
+                        <h4 class="font-bold text-lg mb-2">事業継続計画 (BCP) インタラクティブ・チェックリスト</h4>
+                        <p class="text-sm text-gray-600 mb-4">自身の病気・入院を「災害」と捉え、事業を止めないための計画を立てましょう。クリックして詳細を確認し、準備が完了したらチェックを入れてください。</p>
+                        <div id="bcp-checklist" class="space-y-3"></div>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div class="p-6">
+                        <h4 class="font-bold text-lg mb-2">業務の可視化とマニュアル化</h4>
+                        <p class="text-sm text-gray-600 mb-4">自分にしか分からない業務は最大のリスクです。業務を棚卸し、誰でも理解できるマニュアルを作成することで、業務の属人化を防ぎ、円滑な引き継ぎを可能にします。</p>
+                        <ul class="space-y-2 text-sm list-disc list-inside text-gray-700">
+                            <li><strong>業務の洗い出し:</strong> 週次・月次・年次の全業務をリストアップする。</li>
+                            <li><strong>優先順位付け:</strong> 緊急時に優先すべき重要業務を特定する。</li>
+                            <li><strong>マニュアル作成:</strong> 目的、手順、連絡先、データ保管場所などを具体的に記載。</li>
+                            <li><strong>デジタル化と保管:</strong> クラウドに保存し、紙でも一部保管する。</li>
+                        </ul>
+                        <p class="mt-4 text-xs text-blue-700 bg-blue-50 p-3 rounded-lg"><strong>ポイント:</strong> マニュアル化は、将来の事業承継や事務所売却の際にも「見える資産」として大きな価値を持ちます。</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+
+        <section id="emergency" class="mb-16 scroll-mt-20">
+            <div class="flex items-center mb-6">
+                <span class="text-4xl mr-4">🚑</span>
+                <div>
+                    <h3 class="text-2xl font-bold text-gray-800">Phase 2: 緊急対応 - いざという時の初動</h3>
+                    <p class="text-gray-600">事態発生後の迅速かつ的確な初動が、信頼の維持と混乱の防止に繋がります。ここでは、顧客対応と業務引き継ぎの具体的な流れを確認します。</p>
+                </div>
+            </div>
+            
+            <div class="card p-6">
+                <h4 class="font-bold text-lg mb-4 text-center">緊急対応フロー</h4>
+                <div class="max-w-2xl mx-auto">
+                    <div class="flow-step">
+                        <div class="flow-dot"><div class="flow-dot-inner"></div></div>
+                        <h5 class="font-bold text-md text-blue-700">Step 1: 顧客への連絡と情報開示</h5>
+                        <p class="text-sm text-gray-600 mt-1">状況を正直に、かつ迅速に伝えます。業務中断期間の見通しや、今後の対応方針（業務代行など）を明確に説明し、顧客の不安を和らげることが最優先です。再委託する場合は、必ず顧客の承諾を得ましょう。</p>
+                    </div>
+                    <div class="flow-step">
+                        <div class="flow-dot"><div class="flow-dot-inner"></div></div>
+                        <h5 class="font-bold text-md text-blue-700">Step 2: 業務代行者への引き継ぎ</h5>
+                        <p class="text-sm text-gray-600 mt-1">事前に作成したマニュアルとBCPに基づき、提携社労士へ業務を引き継ぎます。特に、守秘義務と個人情報保護の徹底は最重要事項。委託契約書の内容を再確認し、情報管理体制について明確に申し伝えます。</p>
+                    </div>
+                    <div class="flow-step">
+                        <div class="flow-dot"><div class="flow-dot-inner"></div></div>
+                        <h5 class="font-bold text-md text-blue-700">Step 3: 関係各所への連絡</h5>
+                        <p class="text-sm text-gray-600 mt-1">所属する社会保険労務士会や、その他関係機関へ状況を報告します。利用可能な支援制度がないか確認することも重要です。</p>
+                    </div>
+                </div>
+                <div class="mt-6">
+                    <div class="card-header bg-gray-50 rounded-t-lg" data-accordion="legal-duties">
+                        <h5 class="font-bold text-md">法的・倫理的義務の重要ポイント</h5>
+                        <span class="transform transition-transform duration-300">▼</span>
+                    </div>
+                    <div id="accordion-content-legal-duties" class="card-content">
+                        <div class="content-inner border border-t-0 border-gray-200 rounded-b-lg">
+                            <ul class="space-y-3 text-sm list-disc list-inside text-gray-700">
+                                <li><strong>守秘義務 (社労士法第21条):</strong> 業務上知り得た秘密の漏洩・盗用は厳禁。この義務は廃業後も永続します。</li>
+                                <li><strong>監督責任 (個人情報保護法):</strong> 業務を委託する場合、委託先が個人情報を安全に管理するよう「必要かつ適切な監督」を行う義務があります。委託先での漏洩は、委託元の責任問題に発展する可能性があります。</li>
+                                <li><strong>契約の重要性:</strong> 業務委託契約書や秘密保持契約（NDA）を締結し、責任の所在、再委託の可否、情報の取り扱いなどを明確に定めます。</li>
+                                <li><strong>資格処分のリスク:</strong> 業務停止や顧客対応の不備は、全国社会保険労務士会連合会の規定により、業務停止や失格処分に繋がる可能性があります。</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section id="during-leave" class="mb-16 scroll-mt-20">
+            <div class="flex items-center mb-6">
+                <span class="text-4xl mr-4">💰</span>
+                <div>
+                    <h3 class="text-2xl font-bold text-gray-800">Phase 3: 休業中の管理 - 経済的安定と事業の維持</h3>
+                    <p class="text-gray-600">治療に専念するためには、経済的な不安を解消することが不可欠です。ここでは、収入減少への備えと、利用可能な公的・私的支援制度について解説します。</p>
+                </div>
+            </div>
+
+            <div class="grid md:grid-cols-5 gap-8">
+                <div class="md:col-span-3 card p-6">
+                    <h4 class="font-bold text-lg mb-2">収入減少シミュレーター</h4>
+                    <p class="text-sm text-gray-600 mb-4">個人事業主には傷病手当金がありません。休業による収入減の影響と、所得補償保険の重要性を視覚的に確認しましょう。</p>
+                    <div class="mb-4">
+                        <label for="income-slider" class="block text-sm font-medium text-gray-700">あなたの平均月収: <span id="income-value" class="font-bold text-blue-600">30万円</span></label>
+                        <input id="income-slider" type="range" min="10" max="100" value="30" class="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer">
+                    </div>
+                    <div class="chart-container">
+                        <canvas id="income-chart"></canvas>
+                    </div>
+                </div>
+                <div class="md:col-span-2 card p-6">
+                    <h4 class="font-bold text-lg mb-4">利用可能な支援制度</h4>
+                    <div class="space-y-2">
+                        <div id="support-tabs" class="flex rounded-lg bg-gray-200 p-1">
+                            <button class="tab-button w-1/2 p-2 rounded-md text-sm font-medium active" data-tab="private">私的支援</button>
+                            <button class="tab-button w-1/2 p-2 rounded-md text-sm font-medium" data-tab="public">公的支援</button>
+                        </div>
+                        <div id="tab-content-private" class="tab-content text-sm space-y-2">
+                            <p class="font-semibold mt-2">所得補償保険・就業不能保険</p>
+                            <p class="text-gray-600">病気やケガで働けない間の収入を補償。免責期間（7日、30日等）が長いほど保険料は安くなります。</p>
+                            <p class="font-semibold mt-2">士業向け団体保険</p>
+                            <p class="text-gray-600">所属する社労士会が提供する団体割引の保険プランも選択肢の一つです。</p>
+                        </div>
+                        <div id="tab-content-public" class="tab-content text-sm space-y-2 hidden">
+                             <p class="font-semibold mt-2">小規模企業共済の貸付制度</p>
+                             <p class="text-gray-600">傷病災害時貸付けなどを低金利で利用可能。</p>
+                             <p class="font-semibold mt-2">国民健康保険料・年金保険料の減免/猶予</p>
+                             <p class="text-gray-600">収入減などの理由で申請可能。お住まいの市区町村に相談。</p>
+                             <p class="font-semibold mt-2">生活福祉資金貸付制度</p>
+                             <p class="text-gray-600">低所得世帯向けの貸付制度。社会福祉協議会が窓口。</p>
+                        </div>
+                    </div>
+                     <div class="mt-4 text-xs text-blue-700 bg-blue-50 p-3 rounded-lg">
+                        <strong>税務上の注意点:</strong> 事業再開の意思があれば、休業中でも家賃や減価償却費などの経費計上が認められる場合があります。確定申告書の「特殊事情」欄に休業の旨を記載しましょう。
+                    </div>
+                </div>
+            </div>
+        </section>
+
+
+        <section id="return" class="scroll-mt-20">
+            <div class="flex items-center mb-6">
+                <span class="text-4xl mr-4">🤝</span>
+                <div>
+                    <h3 class="text-2xl font-bold text-gray-800">Phase 4: 復帰準備 - スムーズな事業再開へ</h3>
+                    <p class="text-gray-600">体調が回復し、事業再開の目処が立ったら、計画的に復帰準備を進めます。ここでは、業務の再把握と顧客との関係再構築のポイントを解説します。</p>
+                </div>
+            </div>
+            
+            <div class="grid md:grid-cols-2 gap-8">
+                <div class="card p-6">
+                    <h4 class="font-bold text-lg mb-2">業務のキャッチアップと再開計画</h4>
+                    <p class="text-sm text-gray-600 mb-4">焦りは禁物です。段階的な復帰を目指しましょう。</p>
+                    <ul class="space-y-3 text-sm list-disc list-inside text-gray-700">
+                        <li><strong>情報収集:</strong> 業務代行者から休業中の業務内容、進捗、発生した問題点などについて詳細な報告を受けます。</li>
+                        <li><strong>顧客への挨拶:</strong> 復帰の目処が立った段階で、まずは挨拶と感謝を伝えます。具体的な業務再開時期を連絡し、安心感を与えます。</li>
+                        <li><strong>段階的な業務再開:</strong> 全ての業務を一度に再開するのではなく、負担の少ない業務から徐々に慣らしていきます。</li>
+                        <li><strong>BCPの見直し:</strong> 今回の経験を踏まえ、事業継続計画（BCP）やマニュアルに改善点がないか見直し、次の不測の事態に備えます。</li>
+                    </ul>
+                </div>
+
+                <div class="card p-6">
+                    <h4 class="font-bold text-lg mb-2">支援ネットワークの再確認</h4>
+                    <p class="text-sm text-gray-600 mb-4">今回の経験は、支えてくれるネットワークの重要性を再認識する機会です。今後のために、関係性をより強固なものにしましょう。</p>
+                    <div class="space-y-4">
+                        <div class="flex items-start">
+                            <span class="text-2xl mr-3">👥</span>
+                            <div>
+                                <h5 class="font-semibold">提携社労士との連携強化</h5>
+                                <p class="text-sm text-gray-600">緊急時に助けてくれた提携社労士とは、今後も良好な関係を維持しましょう。定期的な情報交換や、逆にこちらから協力できることがないか模索することも大切です。</p>
+                            </div>
+                        </div>
+                        <div class="flex items-start">
+                             <span class="text-2xl mr-3">🏢</span>
+                            <div>
+                                <h5 class="font-semibold">所属士業会の活用</h5>
+                                <p class="text-sm text-gray-600">都道府県の社会保険労務士会などが提供する研修や相談窓口、会員向けサービスを積極的に活用し、最新情報の入手や人脈形成に努めましょう。</p>
+                            </div>
+                        </div>
+                         <div class="flex items-start">
+                             <span class="text-2xl mr-3">🌐</span>
+                            <div>
+                                <h5 class="font-semibold">マッチングプラットフォーム</h5>
+                                <p class="text-sm text-gray-600">士業向けのマッチングサービスも、新たなビジネスパートナーや協力者を見つけるための有効なツールです。</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+    </main>
+
+    <footer class="bg-gray-800 text-white mt-16">
+        <div class="container mx-auto px-4 py-6 text-center text-sm">
+            <p>&copy; 2024 個人社労士向け 危機管理インタラクティブガイド. All Rights Reserved.</p>
+            <p class="mt-1 text-gray-400">このガイドは情報提供を目的としており、個別の事案に対する法的助言を構成するものではありません。</p>
+        </div>
+    </footer>
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    const bcpData = [
+        {
+            title: '業務代行体制の構築',
+            content: '信頼できる他の社労士と事前に業務提携契約を締結します。契約書には、報酬、責任範囲、守秘義務、再委託の可否などを明記しておくことが重要です。'
+        },
+        {
+            title: '連絡系統・情報共有のルール化',
+            content: '緊急時に誰が、誰に、何を、どのように連絡するかを定めた緊急連絡網を作成します。顧客、提携社労士、家族、所属士業会など、連絡先リストを準備し、安全な場所に保管します。'
+        },
+        {
+            title: '情報管理とデータバックアップ',
+            content: '顧客情報や業務データは、クラウドストレージなどを活用して定期的にバックアップします。物理的なPCの故障や災害時にもデータを失わない体制を構築します。'
+        },
+        {
+            title: '経済的備え（保険加入）',
+            content: '個人事業主は傷病手当金がないため、所得補償保険や就業不能保険への加入を検討します。自身の貯蓄額を考慮し、適切な免責期間と補償額を設定します。'
+        },
+        {
+            title: '物理的対策と備蓄',
+            content: '自宅兼事務所の場合、家具の固定や非常食・水の備蓄（3日分目安）など、災害への備えも行います。地域のハザードマップや避難場所も確認しておきましょう。'
+        }
+    ];
+
+    const bcpChecklist = document.getElementById('bcp-checklist');
+    bcpData.forEach((item, index) => {
+        const div = document.createElement('div');
+        div.className = 'bcp-item border border-gray-200 rounded-lg';
+        div.innerHTML = `
+            <div class="flex items-center p-3 cursor-pointer" data-bcp-index="${index}">
+                <div class="bcp-checkbox w-6 h-6 border-2 border-gray-300 rounded-md mr-3 flex items-center justify-center transition-colors"></div>
+                <span class="font-medium flex-1">${item.title}</span>
+                <span class="text-gray-400 text-xl transform transition-transform duration-300" data-arrow>▼</span>
+            </div>
+            <div class="bcp-content max-h-0 overflow-hidden transition-all duration-500 ease-in-out">
+                <p class="text-sm text-gray-600 p-4 pt-0">${item.content}</p>
+            </div>
+        `;
+        bcpChecklist.appendChild(div);
+    });
+
+    bcpChecklist.addEventListener('click', function(e) {
+        const header = e.target.closest('[data-bcp-index]');
+        if (!header) return;
+
+        const index = header.dataset.bcpIndex;
+        const item = header.parentElement;
+        const content = item.querySelector('.bcp-content');
+        const arrow = item.querySelector('[data-arrow]');
+        
+        const isCheckboxClick = e.target.classList.contains('bcp-checkbox');
+
+        if (isCheckboxClick) {
+            item.classList.toggle('completed');
+        } else {
+             if (content.style.maxHeight && content.style.maxHeight !== '0px') {
+                content.style.maxHeight = '0px';
+                arrow.style.transform = 'rotate(0deg)';
+            } else {
+                document.querySelectorAll('.bcp-content').forEach(c => c.style.maxHeight = '0px');
+                document.querySelectorAll('[data-arrow]').forEach(a => a.style.transform = 'rotate(0deg)');
+                content.style.maxHeight = content.scrollHeight + 'px';
+                arrow.style.transform = 'rotate(180deg)';
+            }
+        }
+    });
+
+    const accordions = document.querySelectorAll('[data-accordion]');
+    accordions.forEach(accordion => {
+        accordion.addEventListener('click', () => {
+            const content = document.getElementById('accordion-content-' + accordion.dataset.accordion);
+            const arrow = accordion.querySelector('span');
+            if (content.style.maxHeight && content.style.maxHeight !== '0px') {
+                content.style.maxHeight = '0';
+                arrow.style.transform = 'rotate(0deg)';
+            } else {
+                content.style.maxHeight = content.scrollHeight + 'px';
+                arrow.style.transform = 'rotate(180deg)';
+            }
+        });
+    });
+
+    const incomeSlider = document.getElementById('income-slider');
+    const incomeValue = document.getElementById('income-value');
+    const ctx = document.getElementById('income-chart').getContext('2d');
+    let incomeChart;
+
+    function updateChart(income) {
+        const incomeData = {
+            monthlyIncome: income * 10000,
+            insuranceCoverage: Math.min(income * 10000 * 0.6, 500000), 
+        };
+
+        if (incomeChart) {
+            incomeChart.destroy();
+        }
+
+        incomeChart = new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: ['通常の月収', '休業時の収入', '保険適用後の収入'],
+                datasets: [{
+                    label: '月収（円）',
+                    data: [
+                        incomeData.monthlyIncome, 
+                        0, 
+                        incomeData.insuranceCoverage
+                    ],
+                    backgroundColor: [
+                        'rgba(59, 130, 246, 0.6)',
+                        'rgba(239, 68, 68, 0.6)',
+                        'rgba(22, 163, 74, 0.6)'
+                    ],
+                    borderColor: [
+                        'rgba(59, 130, 246, 1)',
+                        'rgba(239, 68, 68, 1)',
+                        'rgba(22, 163, 74, 1)'
+                    ],
+                    borderWidth: 1
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        ticks: {
+                            callback: function(value, index, values) {
+                                return value.toLocaleString() + '円';
+                            }
+                        }
+                    }
+                },
+                plugins: {
+                    legend: {
+                        display: false
+                    },
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                let label = context.dataset.label || '';
+                                if (label) {
+                                    label += ': ';
+                                }
+                                if (context.parsed.y !== null) {
+                                    label += context.parsed.y.toLocaleString() + '円';
+                                }
+                                return label;
+                            }
+                        }
+                    }
+                }
+            }
+        });
+    }
+
+    incomeSlider.addEventListener('input', (e) => {
+        const value = e.target.value;
+        incomeValue.textContent = `${value}万円`;
+        updateChart(value);
+    });
+
+    updateChart(incomeSlider.value);
+
+    const supportTabs = document.getElementById('support-tabs');
+    const tabContents = {
+        private: document.getElementById('tab-content-private'),
+        public: document.getElementById('tab-content-public')
+    };
+
+    supportTabs.addEventListener('click', (e) => {
+        if (e.target.tagName === 'BUTTON') {
+            const tab = e.target.dataset.tab;
+            
+            supportTabs.querySelectorAll('button').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            e.target.classList.add('active');
+
+            Object.values(tabContents).forEach(content => {
+                content.classList.add('hidden');
+            });
+            tabContents[tab].classList.remove('hidden');
+        }
+    });
+
+    const navLinks = document.querySelectorAll('.nav-link');
+    const sections = document.querySelectorAll('main section');
+    const mobileNav = document.getElementById('mobile-nav');
+
+    function changeNav(id) {
+        navLinks.forEach(link => {
+            link.classList.remove('nav-active');
+            link.classList.add('nav-inactive');
+            if (link.getAttribute('href') === id) {
+                link.classList.add('nav-active');
+                link.classList.remove('nav-inactive');
+            }
+        });
+        if (mobileNav.value !== id) {
+            mobileNav.value = id;
+        }
+    }
+
+    const observer = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+            if (entry.isIntersecting) {
+                changeNav('#' + entry.target.id);
+            }
+        });
+    }, { rootMargin: '-20% 0px -80% 0px' });
+
+    sections.forEach(section => {
+        observer.observe(section);
+    });
+
+    navLinks.forEach(link => {
+        link.addEventListener('click', (e) => {
+            e.preventDefault();
+            document.querySelector(link.getAttribute('href')).scrollIntoView({
+                behavior: 'smooth'
+            });
+        });
+    });
+
+    mobileNav.addEventListener('change', (e) => {
+        document.querySelector(e.target.value).scrollIntoView({
+            behavior: 'smooth'
+        });
+    });
+});
+</script>
+</body>
+</html>
